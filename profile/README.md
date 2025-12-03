@@ -4,6 +4,16 @@
 
 This Github organization is home to open-source example applications showcasing _how to use_ Resonate to solve for common distributed system challenges.
 
+**What is Resonate!?**
+
+_Resonate is by developers, for developers._
+
+**Leave retries, crash recovery (durable execution), idempotency guarantees, service discovery, load balancing, suspension, etc.. to Resonate.**
+
+_Focus on your product._
+
+**Resonate APIs are the quality-of-life improvement developers have been yearning for.**
+
 ## From development to deployment
 
 Many, if not most, of these examples showcase code that does not need to change when deployed.
