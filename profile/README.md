@@ -25,8 +25,8 @@ Note: Currently, only the TypeScript SDK supports serverless shims.
 
 **Countdown notification**
 
-[Cloudflare Function countdown notification | **TypeScript**](https://github.com/resonatehq-examples/example-countdown-cloudflare-ts)
-[Google Function countdown notification | **TypeScript**](https://github.com/resonatehq-examples/example-countdown-gcp-ts)
+- [Cloudflare Function countdown notification | **TypeScript**](https://github.com/resonatehq-examples/example-countdown-cloudflare-ts)
+- [Google Function countdown notification | **TypeScript**](https://github.com/resonatehq-examples/example-countdown-gcp-ts)
 
 ### Human-in-the-loop cases
 
