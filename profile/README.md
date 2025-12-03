@@ -7,7 +7,7 @@ This Github organization is home to open-source example applications showcasing 
 ## From development to deployment
 
 Many, if not most, of these examples showcase code that does not need to change when deployed.
-The only exception perhap being Resonate Server connection details.
+The only exception perhaps being Resonate Server connection details.
 
 ## Showcased examples
 
