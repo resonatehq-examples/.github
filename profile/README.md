@@ -17,7 +17,7 @@ _Focus on your product._
 ## From development to deployment
 
 Many, if not most, of these examples showcase code that does not need to change when deployed.
-The only exception perhaps being Resonate Server connection details.
+The only exception perhaps being Resonate Server connection details or importing a FaaS shim.
 
 ## Showcased examples
 
