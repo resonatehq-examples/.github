@@ -2,7 +2,7 @@
 
 # Resonate Example Applications
 
-**Production-ready examples demonstrating distributed async await with durable execution.**
+**Examples of production-ready patterns demonstrating distributed async await with durable execution.**
 
 This organization hosts battle-tested patterns for building reliable distributed systems without the complexity. From human-in-the-loop workflows to saga patterns, from serverless long-running functions to Kafka workers - see how Resonate solves real problems with clean code.
 
@@ -25,39 +25,147 @@ Resonate handles the hard parts automatically:
 
 ## Quick Start
 
+### 1. Install the Resonate Server & CLI
+
+```bash
+brew install resonatehq/tap/resonate
+```
+
+### 2. Install the Resonate SDK
+
+**TypeScript:**
+```bash
+npm install @resonatehq/sdk
+```
+
+**Python:**
+```bash
+pip install resonate-sdk
+```
+
+### 3. Write your first Resonate Function
+
+An AI research agent that breaks down complex topics, researches sub-topics in parallel, and synthesizes results - all with automatic crash recovery.
+
+**TypeScript (research-agent.ts):**
+
 ```typescript
-// TypeScript - Durable workflow in 10 lines
 import { Resonate, type Context } from '@resonatehq/sdk';
+import Anthropic from '@anthropic-ai/sdk';
 
-const resonate = new Resonate();
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-function* processOrder(ctx: Context, orderId: string) {
-  const order = yield* ctx.run(fetchOrder, orderId);
-  const payment = yield* ctx.run(chargeCard, order);
-  const shipment = yield* ctx.run(createShipment, order);
-  return { payment, shipment };
+function* researchAgent(ctx: Context, topic: string) {
+  // Break down topic into sub-topics (durable)
+  const subtopics = yield* ctx.run(async () => {
+    const response = await anthropic.messages.create({
+      model: 'claude-3-5-sonnet-20241022',
+      max_tokens: 1024,
+      messages: [{ role: 'user', content: `Break "${topic}" into 3 key subtopics` }]
+    });
+    return parseSubtopics(response.content[0].text);
+  });
+
+  // Research all subtopics in parallel (structured concurrency)
+  const researchFutures = subtopics.map((st, i) =>
+    ctx.beginRun(researchSubtopic, st, `${topic}.${i}`)
+  );
+
+  const results = [];
+  for (const future of researchFutures) {
+    results.push(yield* future);
+  }
+
+  // Synthesize findings (durable)
+  return yield* ctx.run(synthesize, topic, results);
 }
 
-resonate.register(processOrder);
-await resonate.run('order/123', 'processOrder', '123');
+function* researchSubtopic(ctx: Context, subtopic: string, id: string) {
+  return yield* ctx.run(async () => {
+    const response = await anthropic.messages.create({
+      model: 'claude-3-5-sonnet-20241022',
+      max_tokens: 2048,
+      messages: [{ role: 'user', content: `Research: ${subtopic}` }]
+    });
+    return { subtopic, content: response.content[0].text };
+  });
+}
+
+const resonate = new Resonate({ url: 'http://localhost:8001' });
+resonate.register(researchAgent);
+resonate.register(researchSubtopic);
 ```
+
+[Working example →](https://github.com/resonatehq-examples/example-openai-deep-research-agent-ts)
+
+**Python (research_agent.py):**
 
 ```python
-# Python - Same concepts, async/await syntax
-from resonate.context import Context
-from resonate.resonate import Resonate
+from resonate import Resonate, Context
+from anthropic import Anthropic
+from threading import Event
 
-resonate = Resonate()
+client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
 
-@resonate.register
-async def process_order(ctx: Context, order_id: str):
-    order = await ctx.run(fetch_order, order_id)
-    payment = await ctx.run(charge_card, order)
-    shipment = await ctx.run(create_shipment, order)
-    return {"payment": payment, "shipment": shipment}
+def research_agent(ctx: Context, topic: str):
+    # Break down topic (durable)
+    subtopics = yield ctx.run(get_subtopics, topic)
 
-await resonate.run("order/123", process_order, "123")
+    # Research in parallel (structured concurrency)
+    futures = [
+        ctx.lfc(research_subtopic, f"{topic}.{i}", st)
+        for i, st in enumerate(subtopics)
+    ]
+
+    results = [yield future for future in futures]
+
+    # Synthesize (durable)
+    return (yield ctx.run(synthesize, topic, results))
+
+def get_subtopics(_: Context, topic: str):
+    response = client.messages.create(
+        model="claude-3-5-sonnet-20241022",
+        max_tokens=1024,
+        messages=[{"role": "user", "content": f'Break "{topic}" into 3 subtopics'}]
+    )
+    return parse_subtopics(response.content[0].text)
+
+resonate = Resonate.remote()
+resonate.register(research_agent)
+resonate.register(research_subtopic)
+resonate.start()
+Event().wait()
 ```
+
+[Working example →](https://github.com/resonatehq-examples/example-ai-travel-assistant-py)
+
+### 4. Start the server
+
+```bash
+resonate dev
+```
+
+### 5. Start the worker
+
+**TypeScript:**
+```bash
+npx tsx research-agent.ts
+```
+
+**Python:**
+```bash
+python research_agent.py
+```
+
+### 6. Activate the function
+
+```bash
+resonate invoke research.1 --func researchAgent --arg "Distributed Systems"
+```
+
+### 7. Result
+
+The agent researches sub-topics in parallel. If it crashes, Resonate automatically resumes from the last checkpoint - no work is lost.
 
 ## Featured Examples
 
