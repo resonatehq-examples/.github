@@ -260,7 +260,7 @@ Deploy Resonate server anywhere:
 ### Documentation
 - 📘 [Official Docs](https://docs.resonatehq.io)
 - 🧠 [Distributed Async Await Explained](https://distributed-async-await.io)
-- 📖 [SEAA (Suspendable Execution Async Await)](https://seaa.dev)
+- 📖 [SEAA (Systems Engineering for Agentic Applications)](https://systems-engineering-for-agentic-applications.resonatehq.io/)
 
 ### SDKs
 - [TypeScript SDK](https://github.com/resonatehq/resonate-sdk-ts) - npm install @resonatehq/sdk
