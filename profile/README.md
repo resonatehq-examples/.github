@@ -45,99 +45,59 @@ pip install resonate-sdk
 
 ### 3. Write your first Resonate Function
 
-An AI research agent that breaks down complex topics, researches sub-topics in parallel, and synthesizes results - all with automatic crash recovery.
+A countdown as a loop. Simple, but the function can run for minutes, hours, or days, despite restarts.
 
-**TypeScript (research-agent.ts):**
+**TypeScript (countdown.ts):**
 
 ```typescript
 import { Resonate, type Context } from '@resonatehq/sdk';
-import Anthropic from '@anthropic-ai/sdk';
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-function* researchAgent(ctx: Context, topic: string) {
-  // Break down topic into sub-topics (durable)
-  const subtopics = yield* ctx.run(async () => {
-    const response = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 1024,
-      messages: [{ role: 'user', content: `Break "${topic}" into 3 key subtopics` }]
-    });
-    return parseSubtopics(response.content[0].text);
-  });
-
-  // Research all subtopics in parallel (structured concurrency)
-  const researchFutures = subtopics.map((st, i) =>
-    ctx.beginRun(researchSubtopic, st, `${topic}.${i}`)
-  );
-
-  const results = [];
-  for (const future of researchFutures) {
-    results.push(yield* future);
+function* countdown(context: Context, count: number, delay: number) {
+  for (let i = count; i > 0; i--) {
+    // Run a function, persist its result
+    yield* context.run((context: Context) => console.log(`Countdown: ${i}`));
+    // Sleep
+    yield* context.sleep(delay * 1000);
   }
-
-  // Synthesize findings (durable)
-  return yield* ctx.run(synthesize, topic, results);
+  console.log("Done!");
 }
 
-function* researchSubtopic(ctx: Context, subtopic: string, id: string) {
-  return yield* ctx.run(async () => {
-    const response = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 2048,
-      messages: [{ role: 'user', content: `Research: ${subtopic}` }]
-    });
-    return { subtopic, content: response.content[0].text };
-  });
-}
-
+// Instantiate Resonate
 const resonate = new Resonate({ url: 'http://localhost:8001' });
-resonate.register(researchAgent);
-resonate.register(researchSubtopic);
+// Register the function
+resonate.register(countdown);
 ```
 
-[Working example →](https://github.com/resonatehq-examples/example-openai-deep-research-agent-ts)
+[Working example →](https://github.com/resonatehq-examples/example-quickstart-ts)
 
-**Python (research_agent.py):**
+**Python (countdown.py):**
 
 ```python
 from resonate import Resonate, Context
-from anthropic import Anthropic
 from threading import Event
 
-client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+def countdown(ctx: Context, count: int, delay: int):
+    for i in range(count, 0, -1):
+        # Run a function, persist its result
+        yield ctx.run(ntfy, i)
+        # Sleep
+        yield ctx.sleep(delay)
+    print("Done!")
 
-def research_agent(ctx: Context, topic: str):
-    # Break down topic (durable)
-    subtopics = yield ctx.run(get_subtopics, topic)
 
-    # Research in parallel (structured concurrency)
-    futures = [
-        ctx.lfc(research_subtopic, f"{topic}.{i}", st)
-        for i, st in enumerate(subtopics)
-    ]
+def ntfy(_: Context, i: int):
+    print(f"Countdown: {i}")
 
-    results = [yield future for future in futures]
 
-    # Synthesize (durable)
-    return (yield ctx.run(synthesize, topic, results))
-
-def get_subtopics(_: Context, topic: str):
-    response = client.messages.create(
-        model="claude-3-5-sonnet-20241022",
-        max_tokens=1024,
-        messages=[{"role": "user", "content": f'Break "{topic}" into 3 subtopics'}]
-    )
-    return parse_subtopics(response.content[0].text)
-
+# Instantiate Resonate
 resonate = Resonate.remote()
-resonate.register(research_agent)
-resonate.register(research_subtopic)
-resonate.start()
-Event().wait()
+# Register the function
+resonate.register(countdown)
+resonate.start()  # Start Resonate threads
+Event().wait()  # Keep the main thread alive
 ```
 
-[Working example →](https://github.com/resonatehq-examples/example-ai-travel-assistant-py)
+[Working example →](https://github.com/resonatehq-examples/example-quickstart-py)
 
 ### 4. Start the server
 
@@ -149,23 +109,34 @@ resonate dev
 
 **TypeScript:**
 ```bash
-npx tsx research-agent.ts
+npx ts-node countdown.ts
 ```
 
 **Python:**
 ```bash
-python research_agent.py
+python countdown.py
 ```
 
 ### 6. Activate the function
 
+Activate the function with execution ID `countdown.1`:
+
 ```bash
-resonate invoke research.1 --func researchAgent --arg "Distributed Systems"
+resonate invoke countdown.1 --func countdown --arg 5 --arg 60
 ```
 
 ### 7. Result
 
-The agent researches sub-topics in parallel. If it crashes, Resonate automatically resumes from the last checkpoint - no work is lost.
+You will see the countdown in the terminal:
+
+```
+Countdown: 5
+Countdown: 4
+Countdown: 3
+Countdown: 2
+Countdown: 1
+Done!
+```
 
 ## Featured Examples
 
