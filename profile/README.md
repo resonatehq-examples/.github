@@ -2,7 +2,7 @@
 
 # Resonate Example Applications
 
-**Examples of production-ready patterns demonstrating distributed async await with durable execution.**
+**Examples of production-ready patterns demonstrating distributed async await and durable execution.**
 
 This organization hosts battle-tested patterns for building reliable distributed systems without the complexity. From human-in-the-loop workflows to saga patterns, from serverless long-running functions to Kafka workers - see how Resonate solves real problems with clean code.
 
