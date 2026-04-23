@@ -151,19 +151,14 @@ Perfect for learning the basics:
 | Example | Description | Language |
 |---------|-------------|----------|
 | [**Human in the Loop**](https://github.com/resonatehq-examples/example-human-in-the-loop-ts) | Workflows that pause for approval | TypeScript |
-| [**Money Transfer**](https://github.com/resonatehq-examples/example-money-transfer-application-ts) | Saga pattern for distributed transactions | TypeScript |
 | [**Hello World**](https://github.com/resonatehq-examples/example-hello-world-ts) | Your first durable function | TypeScript, Python |
 
 ### 🚀 Production Patterns
 
 Real-world architectures:
 
-#### Saga Pattern & Distributed Transactions
-- [**Money Transfer**](https://github.com/resonatehq-examples/example-money-transfer-application-ts) - Atomic operations across accounts (TypeScript)
-
 #### Human-in-the-Loop Workflows
 - [**Approval Workflows**](https://github.com/resonatehq-examples/example-human-in-the-loop-ts) - Workflows that suspend awaiting human input (TypeScript)
-- [**Website Summarization Agent**](https://github.com/resonatehq-examples/example-website-summarization-agent-ts) - AI summarization with approval (TypeScript, Python)
 
 #### Message Queue Integration
 - [**Kafka Worker**](https://github.com/resonatehq-examples/example-kafka-worker-py) - Concurrent message processing without head-of-line blocking (Python)
@@ -201,7 +196,6 @@ Deploy and operate Resonate:
 ### TypeScript
 
 - 🎯 [Quickstart](https://github.com/resonatehq-examples/example-quickstart-ts)
-- 💰 [Money Transfer (Saga)](https://github.com/resonatehq-examples/example-money-transfer-application-ts)
 - ✋ [Human-in-the-Loop](https://github.com/resonatehq-examples/example-human-in-the-loop-ts)
 - 🌐 [Async HTTP API](https://github.com/resonatehq-examples/example-async-http-api-ts)
 - ☁️ [Serverless Examples](https://github.com/resonatehq-examples/?q=cloudflare+OR+gcp+OR+supabase&type=all)
@@ -232,11 +226,9 @@ Deploy and operate Resonate:
 | Concept | What It Solves | Example |
 |---------|---------------|---------|
 | **Durable Execution** | Functions survive crashes and resume | [Hello World](https://github.com/resonatehq-examples/example-hello-world-ts) |
-| **Saga Pattern** | Distributed transactions without 2PC | [Money Transfer](https://github.com/resonatehq-examples/example-money-transfer-application-ts) |
 | **Human-in-the-Loop** | Workflows pause for external input | [Approval Workflows](https://github.com/resonatehq-examples/example-human-in-the-loop-ts) |
 | **Structured Concurrency** | Fork-join parallelism made safe | [Load Balancing](https://github.com/resonatehq-examples/example-load-balancing-ts) |
 | **Durable Sleep** | Long waits without holding resources | [Countdown](https://github.com/resonatehq-examples/example-countdown-ts) |
-| **Idempotency** | Safe retries without side effects | [Money Transfer](https://github.com/resonatehq-examples/example-money-transfer-application-ts) |
 | **RPC** | Cross-process durable calls | [Async RPC](https://github.com/resonatehq-examples/example-async-rpc-py) |
 
 ## From Development to Deployment
