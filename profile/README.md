@@ -1,4 +1,8 @@
-![resonatehq-examples org readme banner](./assets/resonatehq-examples-org-readme-banner.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/readme-banner-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="./assets/readme-banner-light.png">
+  <img alt="Resonate Examples — production-shaped patterns. Pick one and run it." src="./assets/readme-banner-dark.png">
+</picture>
 
 # Resonate Example Applications
 
