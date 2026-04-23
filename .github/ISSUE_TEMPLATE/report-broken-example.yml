@@ -43,7 +43,7 @@ body:
         npm install
         npm run start
     validations:
-      required: false
+      required: true
 
   - type: textarea
     id: error
@@ -55,7 +55,7 @@ body:
         ReferenceError: Resonate is not defined
             at /path/to/repo/src/index.ts:3:10
     validations:
-      required: false
+      required: true
 
   - type: textarea
     id: env

@@ -2,8 +2,8 @@
 
 The Resonate Examples organization hosts demonstration code, not production infrastructure. Security issues here typically fall into two buckets:
 
-- **Issues in the example code itself** — vulnerable patterns demonstrated, unsafe defaults, dependencies with known CVEs.
-- **Issues in the Resonate SDKs or server** that surface through an example. These belong in the relevant SDK/server repo, not here.
+- **Issues in the example code itself** — vulnerable patterns demonstrated, unsafe defaults, dependencies with known CVEs that the example actually exposes.
+- **Issues in the Resonate SDKs or server** that surface through an example. These belong upstream.
 
 ## Reporting a vulnerability
 
@@ -11,9 +11,13 @@ The Resonate Examples organization hosts demonstration code, not production infr
 
 Use one of these private channels:
 
-1. **GitHub private vulnerability reporting** (preferred). On the affected repo: `Security` tab → `Report a vulnerability`. We get a private notification immediately.
-2. **Discord DM to a maintainer.** [Resonate Discord](https://resonatehq.io/discord) — DM any member with the `@core-team` role.
-3. **For SDK or server vulnerabilities**, report against the upstream repo (`resonatehq/resonate-sdk-ts`, `resonatehq/resonate-sdk-py`, `resonatehq/resonate-sdk-rs`, `resonatehq/resonate`) rather than the example repo.
+1. **For SDK or server vulnerabilities** (the most impactful path), report against the upstream repo using GitHub's private vulnerability reporting:
+   - [`resonatehq/resonate`](https://github.com/resonatehq/resonate/security/advisories/new) (server)
+   - [`resonatehq/resonate-sdk-ts`](https://github.com/resonatehq/resonate-sdk-ts/security/advisories/new)
+   - [`resonatehq/resonate-sdk-py`](https://github.com/resonatehq/resonate-sdk-py/security/advisories/new)
+   - [`resonatehq/resonate-sdk-rs`](https://github.com/resonatehq/resonate-sdk-rs/security/advisories/new)
+2. **For an example-specific vulnerability** (vulnerable pattern, unsafe default in the example code itself), DM a Resonate maintainer on the [Resonate Discord](https://resonatehq.io/discord) — the team is small and a DM reaches us within a day. Include the repo, the file, and the issue.
+3. **If you're unsure where it belongs**, route via Discord and we'll triage.
 
 ## What to include
 
@@ -30,10 +34,12 @@ Use one of these private channels:
 
 ## Disclosure
 
+We follow **coordinated disclosure with a 90-day default window** from acknowledgment. If you need a different window — shorter for active exploitation, longer for complex remediation — say so in the original report and we'll agree on a schedule. We'll request an extension in writing if a fix needs more time; we won't sit on a report past 90 days without coordinating with you.
+
 Once a fix has shipped, we publish a security advisory on the affected repo. If you want credit for the report, tell us in the original message — we default to anonymous attribution unless asked.
 
 ## What's out of scope
 
-- **Vulnerabilities in dependencies** that the example consumes but doesn't expose (e.g. a transitive npm dep). Report these to the dependency's maintainers; we'll bump the version when the upstream fix lands.
+- **Vulnerabilities in dependencies** that the example consumes but doesn't actively expose. We run Dependabot on every example repo; transitive CVEs are auto-tracked and bumped on the next release. File a security report only if the example's usage pattern actively exposes the dep's vulnerable surface.
 - **Issues in private forks** of these examples. We can only address what's in the public org.
 - **Theoretical vulnerabilities** without a concrete exploit path. Useful, but not security issues until someone shows the impact.
