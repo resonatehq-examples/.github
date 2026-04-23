@@ -1,0 +1,73 @@
+name: Propose a new example
+description: Suggest a new example app for the Resonate Examples org
+title: "[Propose] "
+labels: ["proposal", "new-example"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an example. The strongest proposals show a Resonate-distinctive way of solving a real problem. Before submitting, scan the [Featured](https://github.com/resonatehq-examples) and Browse-all sections of the org profile — your idea may already exist.
+
+  - type: input
+    id: pattern
+    attributes:
+      label: Pattern or use case
+      description: One-line description. "Saga with compensation across three vendors", not "an example using Resonate."
+      placeholder: e.g. Distributed cron with leader election
+    validations:
+      required: true
+
+  - type: dropdown
+    id: language
+    attributes:
+      label: Language
+      multiple: false
+      options:
+        - TypeScript
+        - Python
+        - Rust
+        - Other (explain below)
+    validations:
+      required: true
+
+  - type: textarea
+    id: distinctive
+    attributes:
+      label: What makes this distinctive in Resonate?
+      description: What does Resonate's approach show that the existing catalog doesn't? Which primitive(s) does it exercise (durable sleep, ctx.run, fan-out, promises, locks)?
+      placeholder: |
+        e.g. Shows that ctx.lock() composes with ctx.sleep() to build a leader-election loop in ~20 lines, without an external lock service.
+    validations:
+      required: true
+
+  - type: textarea
+    id: gap
+    attributes:
+      label: Why isn't an existing example sufficient?
+      description: Name the closest existing example and explain what's missing. If you're not sure, list the two or three you considered.
+      placeholder: |
+        e.g. example-distributed-mutex-ts shows the lock primitive but not the leader-election pattern (lock + heartbeat + handoff). example-infinite-workflow-ts shows long-running loops but not coordination across workers.
+    validations:
+      required: true
+
+  - type: textarea
+    id: shape
+    attributes:
+      label: Shape of the example
+      description: Rough sketch of what the repo would contain. Files, key functions, what the reader runs to see it work.
+      placeholder: |
+        - src/leader.ts — main loop
+        - src/election.ts — lock acquisition with heartbeat
+        - npm run start — starts 3 workers; one becomes leader
+        - kill the leader → another takes over within N seconds
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: willing
+    attributes:
+      label: Are you willing to contribute it?
+      options:
+        - label: Yes — I'll submit the PR if approved
+        - label: No — I'm proposing it for someone else to build
+        - label: Maybe — depends on scope
