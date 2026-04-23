@@ -4,296 +4,215 @@
   <img alt="Resonate Examples — production-shaped patterns. Pick one and run it." src="./assets/readme-banner-dark.png">
 </picture>
 
-# Resonate Example Applications
+# Resonate Examples
 
-**Examples of production-ready patterns demonstrating distributed async await and durable execution.**
+**Your code dies when the process dies. Resonate makes that not happen.** You write normal functions; Resonate persists each step so they survive crashes, restarts, and long waits — minutes, hours, or weeks.
 
-This organization hosts battle-tested patterns for building reliable distributed systems without the complexity. From human-in-the-loop workflows to saga patterns, from serverless long-running functions to Kafka workers - see how Resonate solves real problems with clean code.
+That's *durable execution*: the function's progress is the source of truth. If the worker crashes mid-saga, the next worker resumes at the last completed step. No state-machine DSL, no orchestration glue. And because it's just ordinary code, it works the same way whether a human wrote it or an agent did — Resonate's SDKs, CLI, and protocol are shaped for both.
 
-## Why Resonate?
-
-**Write sequential code. Get distributed systems guarantees.**
-
-Resonate handles the hard parts automatically:
-- ✅ **Crash recovery** - Resume exactly where you left off
-- ✅ **Retries & timeouts** - Automatic with exponential backoff
-- ✅ **Idempotency** - Safe to retry operations
-- ✅ **Concurrency** - Structured fork-join patterns
-- ✅ **Observability** - Built-in tracing and metrics
-
-**No more:**
-- ❌ Writing retry logic everywhere
-- ❌ Managing distributed state machines
-- ❌ Debugging non-deterministic failures
-- ❌ Building custom orchestration layers
-
-## Quick Start
-
-### 1. Install the Resonate Server & CLI
+The repos in this org demonstrate the patterns end-to-end. Pin the SDK, clone, run.
 
 ```bash
-brew install resonatehq/tap/resonate
+brew install resonatehq/tap/resonate    # the server
+npm  install @resonatehq/sdk            # or: pip install resonate-sdk · cargo add resonate-sdk
 ```
 
-### 2. Install the Resonate SDK
+[Documentation](https://docs.resonatehq.io) · [Distributed async/await](https://distributed-async-await.io)
 
-**TypeScript:**
-```bash
-npm install @resonatehq/sdk
-```
+## What it looks like
 
-**Python:**
-```bash
-pip install resonate-sdk
-```
-
-### 3. Write your first Resonate Function
-
-A countdown as a loop. Simple, but the function can run for minutes, hours, or days, despite restarts.
-
-**TypeScript (countdown.ts):**
+Here's a saga in Resonate — book a flight, hotel, and car; if any step fails, compensate in reverse. Every `yield* ctx.run()` is a durable checkpoint.
 
 ```typescript
-import { Resonate, type Context } from '@resonatehq/sdk';
+// from example-saga-booking-ts/src/workflow.ts
+// https://github.com/resonatehq-examples/example-saga-booking-ts/blob/873a793/src/workflow.ts
+import type { Context } from "@resonatehq/sdk";
+// ... service imports + a `noRetry` retry policy + a `BookingResult` type
 
-function* countdown(context: Context, count: number, delay: number) {
-  for (let i = count; i > 0; i--) {
-    // Run a function, persist its result
-    yield* context.run((context: Context) => console.log(`Countdown: ${i}`));
-    // Sleep
-    yield* context.sleep(delay * 1000);
+export function* bookTrip(
+  ctx: Context,
+  tripId: string,
+  shouldFail: boolean,
+): Generator<any, BookingResult, any> {
+  let flightId: string | undefined;
+  let hotelId: string | undefined;
+
+  try {
+    flightId = yield* ctx.run(bookFlight, tripId);
+    hotelId = yield* ctx.run(bookHotel, tripId);
+    const carId = yield* ctx.run(
+      bookCarRental,
+      tripId,
+      shouldFail,
+      ctx.options({ retryPolicy: noRetry }),
+    );
+    return { status: "success", tripId, flightId, hotelId, carId };
+  } catch (error) {
+    const message = (error as Error).message;
+    const compensated: string[] = [];
+
+    // Compensate in reverse order — each compensation is also durable
+    if (hotelId) {
+      yield* ctx.run(cancelHotel, tripId, hotelId);
+      compensated.push("hotel");
+    }
+
+    if (flightId) {
+      yield* ctx.run(cancelFlight, tripId, flightId);
+      compensated.push("flight");
+    }
+
+    return { status: "failed", tripId, error: message, compensated };
   }
-  console.log("Done!");
 }
-
-// Instantiate Resonate
-const resonate = new Resonate({ url: 'http://localhost:8001' });
-// Register the function
-resonate.register(countdown);
 ```
 
-[Working example →](https://github.com/resonatehq-examples/example-quickstart-ts)
+What happens when the worker crashes mid-booking:
 
-**Python (countdown.py):**
+```mermaid
+sequenceDiagram
+    participant App as bookTrip
+    participant R as Resonate
 
-```python
-from resonate import Resonate, Context
-from threading import Event
-
-def countdown(ctx: Context, count: int, delay: int):
-    for i in range(count, 0, -1):
-        # Run a function, persist its result
-        yield ctx.run(ntfy, i)
-        # Sleep
-        yield ctx.sleep(delay)
-    print("Done!")
-
-
-def ntfy(_: Context, i: int):
-    print(f"Countdown: {i}")
-
-
-# Instantiate Resonate
-resonate = Resonate.remote()
-# Register the function
-resonate.register(countdown)
-resonate.start()  # Start Resonate threads
-Event().wait()  # Keep the main thread alive
+    App->>R: yield ctx.run(bookFlight)
+    R-->>App: persisted (flightId)
+    App->>R: yield ctx.run(bookHotel)
+    R-->>App: persisted (hotelId)
+    Note over App,R: process crashes
+    Note over App,R: a new worker starts later
+    R->>App: resume from last persisted step
+    App->>R: yield ctx.run(bookCar)
+    R-->>App: persisted (carId)
+    App->>App: return success
 ```
 
-[Working example →](https://github.com/resonatehq-examples/example-quickstart-py)
+No checkpoint table to maintain. No replay logic to write. The generator's position *is* the state.
 
-### 4. Start the server
+## Start here
 
-```bash
-resonate dev
-```
+New to Resonate? Begin with one of these.
 
-### 5. Start the worker
+- [Quickstart (TypeScript)](https://github.com/resonatehq-examples/example-quickstart-ts) — a countdown that survives restarts
+- [Quickstart (Python)](https://github.com/resonatehq-examples/example-quickstart-py) — same shape, Python idioms
+- [Hello World (Rust)](https://github.com/resonatehq-examples/example-hello-world-rs) — the first Rust SDK example
 
-**TypeScript:**
-```bash
-npx ts-node countdown.ts
-```
+## Featured examples
 
-**Python:**
-```bash
-python countdown.py
-```
+A curated set, organized by what each one demonstrates.
 
-### 6. Activate the function
+### Patterns
 
-Activate the function with execution ID `countdown.1`:
+- [Saga + compensation](https://github.com/resonatehq-examples/example-saga-booking-ts) — flight + hotel + car; failure triggers the compensation chain
+- [Fan-out / fan-in](https://github.com/resonatehq-examples/example-fan-out-fan-in-ts) — parallel notification channels with per-channel retry
+- [Distributed mutex](https://github.com/resonatehq-examples/example-distributed-mutex-ts) — a serialized lock in ~15 lines; the generator IS the lock
 
-```bash
-resonate invoke countdown.1 --func countdown --arg 5 --arg 60
-```
+### Integrations
 
-### 7. Result
+- [Next.js (App Router)](https://github.com/resonatehq-examples/example-nextjs-integration-ts) — Server Actions trigger durable workflows; status polling
+- [AWS Lambda](https://github.com/resonatehq-examples/example-aws-lambda-ts) — Lambda as a stateless trigger; breaks the timeout ceiling
+- [Cloudflare Workers](https://github.com/resonatehq-examples/example-countdown-cloudflare-ts) — durable sleep across edge invocations
 
-You will see the countdown in the terminal:
+### Agents
 
-```
-Countdown: 5
-Countdown: 4
-Countdown: 3
-Countdown: 2
-Countdown: 1
-Done!
-```
+- [Templated agent](https://github.com/resonatehq-examples/templated-agent-ts) — extensible agent template, Crawl / Walk / Run progression
+- [Multi-agent orchestration](https://github.com/resonatehq-examples/example-multi-agent-orchestration-ts) — researcher → writer → reviewer with durable handoffs
+- [Deep research agent](https://github.com/resonatehq-examples/example-openai-deep-research-agent-ts) — recursive AI research powered by OpenAI
 
-## Featured Examples
+### Human-in-the-loop
 
-### 🎯 Start Here
+- [Approval workflow](https://github.com/resonatehq-examples/example-human-in-the-loop-ts) — a function that suspends until a human resolves a promise
+- [Kubernetes node drain](https://github.com/resonatehq-examples/example-node-drain-orchestrator-ts) — durable orchestration with operator confirmation
 
-Perfect for learning the basics:
+## Browse all examples
 
-| Example | Description | Language |
-|---------|-------------|----------|
-| [**Human in the Loop**](https://github.com/resonatehq-examples/example-human-in-the-loop-ts) | Workflows that pause for approval | TypeScript |
-| [**Hello World**](https://github.com/resonatehq-examples/example-hello-world-ts) | Your first durable function | TypeScript, Python |
+Beyond Featured — the rest of the catalog grouped by what each example demonstrates. Click to expand.
 
-### 🚀 Production Patterns
+<details>
+<summary><strong>Patterns</strong> (13 more)</summary>
 
-Real-world architectures:
+- [batch-processor](https://github.com/resonatehq-examples/example-batch-processor-ts) — durable progress checkpointing across batches
+- [durable-chatbot](https://github.com/resonatehq-examples/example-durable-chatbot-ts) — multi-turn LLM chat with crash-recoverable conversation state
+- [durable-entity](https://github.com/resonatehq-examples/example-durable-entity-ts) — long-lived entity with durable idle timeout
+- [event-sourcing](https://github.com/resonatehq-examples/example-event-sourcing-ts) — projection from durable event stream, no event store needed
+- [encryption](https://github.com/resonatehq-examples/example-encryption-ts) — AES-256-GCM payload encryption via Encryptor interface
+- [food-delivery](https://github.com/resonatehq-examples/example-food-delivery-ts) — order → kitchen → driver → pickup → delivery as a durable workflow
+- [infinite-workflow](https://github.com/resonatehq-examples/example-infinite-workflow-ts) — while-loop + ctx.sleep; no continueAsNew needed
+- [priority-queue](https://github.com/resonatehq-examples/example-priority-queue-ts) — 4-tier priority with per-tier concurrency limits
+- [rate-limiter](https://github.com/resonatehq-examples/example-rate-limiter-ts) — sleep-based spacing for N requests per second
+- [recursive-factorial (TS)](https://github.com/resonatehq-examples/example-recursive-factorial-ts) · [(Py)](https://github.com/resonatehq-examples/example-recursive-factorial-py) — distributed recursive computation
+- [state-machine](https://github.com/resonatehq-examples/example-state-machine-ts) — order lifecycle with the generator as the state
+- [webhook-handler](https://github.com/resonatehq-examples/example-webhook-handler-ts) — exactly-once webhook processing with deduplication
 
-#### Human-in-the-Loop Workflows
-- [**Approval Workflows**](https://github.com/resonatehq-examples/example-human-in-the-loop-ts) - Workflows that suspend awaiting human input (TypeScript)
+</details>
 
-#### Message Queue Integration
-- [**Kafka Worker**](https://github.com/resonatehq-examples/example-kafka-worker-py) - Concurrent message processing without head-of-line blocking (Python)
-- [**Load Balancing**](https://github.com/resonatehq-examples/example-load-balancing-ts) - Distribute work across worker pools (TypeScript, Python)
+<details>
+<summary><strong>Integrations</strong> (15 more)</summary>
 
-#### Serverless & FaaS
-Run long-duration workflows on serverless platforms that have execution time limits:
+- [browser-worker](https://github.com/resonatehq-examples/example-browser-worker-ts) — a Resonate worker running in a browser tab
+- [countdown-gcp](https://github.com/resonatehq-examples/example-countdown-gcp-ts) · [-supabase](https://github.com/resonatehq-examples/example-countdown-supabase-ts) · [-web](https://github.com/resonatehq-examples/example-countdown-web-ts) — durable sleep across surfaces
+- [databricks-in-the-loop](https://github.com/resonatehq-examples/example-databricks-in-the-loop-py) — integrating Databricks notebooks with a backend service
+- [express-integration](https://github.com/resonatehq-examples/example-express-integration-ts) — POST triggers durable workflow, GET polls status
+- [function-as-a-service (Py)](https://github.com/resonatehq-examples/example-function-as-a-service-py) — on-prem FaaS demo with GPU worker routing
+- [kafka-worker (Py)](https://github.com/resonatehq-examples/example-kafka-worker-py) — concurrent message processing without head-of-line blocking
+- [load-balancing (TS)](https://github.com/resonatehq-examples/example-load-balancing-ts) · [(Py)](https://github.com/resonatehq-examples/example-load-balancing-py) — distribute work across worker pools
+- [mcp-tools](https://github.com/resonatehq-examples/example-mcp-tools-ts) — Resonate behind an MCP server
+- [nextjs-ecommerce](https://github.com/resonatehq-examples/example-nextjs-ecommerce-ts) — one-click buy with 5-second cancellation window, every step durable
+- [supabase-edge](https://github.com/resonatehq-examples/example-supabase-edge-ts) — onboarding workflow triggered by Supabase Edge Function
+- [tigerbeetle-account-creation](https://github.com/resonatehq-examples/example-tigerbeetle-account-creation-ts) — durable financial transactions with TigerBeetle
+- [webservers (Py)](https://github.com/resonatehq-examples/example-webservers-py) — popular Python webserver framework integrations
 
-- [**Deep Research Agent (Cloudflare)**](https://github.com/resonatehq-examples/example-openai-deep-research-agent-cloudflare-ts) - Recursive AI research (TypeScript)
-- [**Deep Research Agent (GCP)**](https://github.com/resonatehq-examples/example-openai-deep-research-agent-gcp-ts) - Recursive AI research (TypeScript)
-- [**Countdown (Supabase)**](https://github.com/resonatehq-examples/example-countdown-supabase-ts) - Durable timers on Edge Functions (TypeScript)
-- [**TigerBeetle + Resonate**](https://github.com/resonatehq-examples/example-tigerbeetle-account-creation-ts) - Durable financial transactions (TypeScript)
+</details>
 
-#### AI & LLM Workflows
-- [**AI Travel Assistant**](https://github.com/resonatehq-examples/example-ai-travel-assistant-py) - Multi-step AI agent with tool use (Python)
-- [**Bluesky Scraper**](https://github.com/resonatehq-examples/example-bluesky-scraper-ts) - Durable social media ingestion (TypeScript)
+<details>
+<summary><strong>Agents &amp; AI</strong> (11 more)</summary>
 
-#### HTTP APIs
-- [**Async HTTP API**](https://github.com/resonatehq-examples/example-async-http-api-ts) - Submit job, poll for results (TypeScript, Python)
-- [**Async RPC**](https://github.com/resonatehq-examples/example-async-rpc-py) - Cross-process communication (Python)
+- [ai-image-pipeline](https://github.com/resonatehq-examples/example-ai-image-pipeline-ts) — parallel AI image generation with crash recovery
+- [ai-travel-assistant (Py)](https://github.com/resonatehq-examples/example-ai-travel-assistant-py) — multi-step AI agent with tool use
+- [async-tools-mcp-server (Py)](https://github.com/resonatehq-examples/example-async-tools-mcp-server-py) — background weather collection for Claude Desktop
+- [bluesky-scraper](https://github.com/resonatehq-examples/example-bluesky-scraper-ts) — durable social media ingestion
+- [hackernews-research-agent (Py)](https://github.com/resonatehq-examples/example-hackernews-research-agent-py) — durable HN research agent
+- [agent-tool-background-job](https://github.com/resonatehq-examples/example-agent-tool-background-job) — async timer tool via MCP
+- [openai-deep-research-agent — Cloudflare](https://github.com/resonatehq-examples/example-openai-deep-research-agent-cloudflare-ts) · [GCP](https://github.com/resonatehq-examples/example-openai-deep-research-agent-gcp-ts) · [Supabase](https://github.com/resonatehq-examples/example-openai-deep-research-agent-supabase-ts) · [Python](https://github.com/resonatehq-examples/example-openai-deep-research-agent-py) — recursive AI research across deployment shapes
+- [schedule-reminder-agent (Py)](https://github.com/resonatehq-examples/example-schedule-reminder-agent-py) — autonomous long-running reminder assistant
 
-### 🔧 Infrastructure Examples
+</details>
 
-Deploy and operate Resonate:
+<details>
+<summary><strong>RPC, HTTP &amp; foundations</strong> (15 more)</summary>
 
-- [**Countdown Examples**](https://github.com/resonatehq-examples/?q=example-countdown&type=all) - Durable sleep across platforms (TypeScript, Python)
-- [**Token Auth**](https://github.com/resonatehq-examples/example-token-auth-ts) - Authentication patterns (TypeScript)
+- [async-http-api (TS)](https://github.com/resonatehq-examples/example-async-http-api-ts) · [(Py)](https://github.com/resonatehq-examples/example-async-http-api-py) — submit job, poll for results
+- [async-rpc (Py)](https://github.com/resonatehq-examples/example-async-rpc-py) — Remote Function Invocation across processes
+- [dao-proposal-scorer](https://github.com/resonatehq-examples/example-dao-proposal-scorer-ts) — off-chain DAO scoring with cryptographic verification
+- [distributed-calculator (Py)](https://github.com/resonatehq-examples/example-distributed-calculator-py) — arithmetic sub-expression distribution
+- [durable-sleep (TS)](https://github.com/resonatehq-examples/example-durable-sleep-ts) · [(Py)](https://github.com/resonatehq-examples/example-durable-sleep-py) — sleep for hours, days, or years
+- [hello-world (TS)](https://github.com/resonatehq-examples/example-hello-world-ts) · [(Py)](https://github.com/resonatehq-examples/example-hello-world-py) · [(Rust)](https://github.com/resonatehq-examples/example-hello-world-rs) — first durable function across SDKs
+- [fan-out-fan-in (Rust)](https://github.com/resonatehq-examples/example-fan-out-fan-in-rs) — Rust fan-out/fan-in
+- [schedule (TS)](https://github.com/resonatehq-examples/example-schedule-ts) · [(Py)](https://github.com/resonatehq-examples/example-schedule-py) — periodic function scheduling
+- [token-auth](https://github.com/resonatehq-examples/example-token-auth-ts) — authentication patterns
+- [resonate-connect-temporal](https://github.com/resonatehq-examples/resonate-connect-temporal) — connector
 
-## Browse by Language
+</details>
 
-<table>
-<tr>
-<td width="50%">
+Or browse on GitHub directly: [TypeScript](https://github.com/orgs/resonatehq-examples/repositories?q=ts&type=all) · [Python](https://github.com/orgs/resonatehq-examples/repositories?q=py&type=all) · [Rust](https://github.com/orgs/resonatehq-examples/repositories?q=rs&type=all)
 
-### TypeScript
+## Momentum
 
-- 🎯 [Quickstart](https://github.com/resonatehq-examples/example-quickstart-ts)
-- ✋ [Human-in-the-Loop](https://github.com/resonatehq-examples/example-human-in-the-loop-ts)
-- 🌐 [Async HTTP API](https://github.com/resonatehq-examples/example-async-http-api-ts)
-- ☁️ [Serverless Examples](https://github.com/resonatehq-examples/?q=cloudflare+OR+gcp+OR+supabase&type=all)
-- 🔐 [Token Auth](https://github.com/resonatehq-examples/example-token-auth-ts)
+- **75 example repos** across TypeScript, Python, and Rust
+- **23 Journal posts** at [journal.resonatehq.io](https://journal.resonatehq.io) — patterns, walkthroughs, design rationale
+- **3 published specifications** — [Distributed Async Await](https://distributed-async-await.io) (served), [Async RPC](https://github.com/resonatehq/async-rpc.io), [Durable Promise](https://github.com/resonatehq/durable-promise-specification)
 
-[See all TypeScript examples →](https://github.com/resonatehq-examples?q=ts&type=all)
+## Community
 
-</td>
-<td width="50%">
-
-### Python
-
-- 🎯 [Quickstart](https://github.com/resonatehq-examples/example-quickstart-py)
-- 🤖 [AI Travel Assistant](https://github.com/resonatehq-examples/example-ai-travel-assistant-py)
-- 📊 [Kafka Worker](https://github.com/resonatehq-examples/example-kafka-worker-py)
-- 🌐 [Async HTTP API](https://github.com/resonatehq-examples/example-async-http-api-py)
-- ⚖️ [Load Balancing](https://github.com/resonatehq-examples/example-load-balancing-py)
-- 🔄 [Async RPC](https://github.com/resonatehq-examples/example-async-rpc-py)
-
-[See all Python examples →](https://github.com/resonatehq-examples?q=py&type=all)
-
-</td>
-</tr>
-</table>
-
-## Key Concepts Demonstrated
-
-| Concept | What It Solves | Example |
-|---------|---------------|---------|
-| **Durable Execution** | Functions survive crashes and resume | [Hello World](https://github.com/resonatehq-examples/example-hello-world-ts) |
-| **Human-in-the-Loop** | Workflows pause for external input | [Approval Workflows](https://github.com/resonatehq-examples/example-human-in-the-loop-ts) |
-| **Structured Concurrency** | Fork-join parallelism made safe | [Load Balancing](https://github.com/resonatehq-examples/example-load-balancing-ts) |
-| **Durable Sleep** | Long waits without holding resources | [Countdown](https://github.com/resonatehq-examples/example-countdown-ts) |
-| **RPC** | Cross-process durable calls | [Async RPC](https://github.com/resonatehq-examples/example-async-rpc-py) |
-
-## From Development to Deployment
-
-Code that works locally works in production - no changes needed. Just point your SDK at a remote Resonate server:
-
-```typescript
-// Local development (embedded server)
-const resonate = new Resonate();
-
-// Production (remote server)
-const resonate = new Resonate({
-  url: 'https://resonate.example.com',
-  auth: { username: 'user', password: 'pass' }
-});
-```
-
-Deploy Resonate server anywhere:
-- Docker / Kubernetes
-- Cloud VMs (AWS, GCP, Azure)
-- Self-hosted on-prem
-
-## Resources
-
-### Documentation
-- 📘 [Official Docs](https://docs.resonatehq.io)
-- 🧠 [Distributed Async Await Explained](https://distributed-async-await.io)
-- 📖 [SEAA (Systems Engineering for Agentic Applications)](https://systems-engineering-for-agentic-applications.resonatehq.io/)
-
-### SDKs
-- [TypeScript SDK](https://github.com/resonatehq/resonate-sdk-ts) - npm install @resonatehq/sdk
-- [Python SDK](https://github.com/resonatehq/resonate-sdk-py) - pip install resonate-sdk
-
-### Community
-- 💬 [Discord](https://discord.gg/R4har9w6) - Ask questions, share patterns
-- 🐛 [Issues](https://github.com/resonatehq-examples/example-quickstart-ts/issues) - Report bugs or request examples
-- 🌐 [Website](https://resonatehq.io) - Learn more about Resonate
-
-## Contributing
-
-We welcome contributions! To add a new example:
-
-1. **Fork** the example template or similar existing example
-2. **Build** your example following existing patterns
-3. **Document** with clear README explaining the use case
-4. **Test** that it works from a fresh clone
-5. **Submit** a PR with description of what problem it solves
-
-See [contribution guidelines](https://github.com/resonatehq/.github/blob/main/CONTRIBUTING.md) for details.
-
-## Example Quality Standards
-
-All examples in this organization follow these standards:
-- ✅ **Runnable** - Clear installation and run instructions
-- ✅ **Documented** - Explains what, why, and how
-- ✅ **Tested** - Works from a fresh git clone
-- ✅ **Modern** - Uses latest SDK versions
-- ✅ **Clean** - Well-structured, readable code
+- Discord: https://resonatehq.io/discord
+- X: https://x.com/resonatehqio
+- LinkedIn: https://linkedin.com/company/resonatehq
+- YouTube: https://youtube.com/@resonatehq
+- Journal: https://journal.resonatehq.io
 
 ## License
 
-Most examples are MIT licensed. Check individual repositories for specifics.
+All examples in this organization are licensed under [Apache-2.0](./LICENSE). Each example repo carries its own `LICENSE` file.
 
----
+## Contributing
 
-**Built with Resonate** - Making distributed systems simple since 2023.
-
-[Get Started](https://docs.resonatehq.io/quickstart) • [Join Discord](https://discord.gg/R4har9w6) • [Learn More](https://resonatehq.io)
+Want to add an example? See [CONTRIBUTING.md](https://github.com/resonatehq-examples/.github/blob/main/CONTRIBUTING.md) for the quality bar and submission flow. To propose a new example or report a broken one, open an issue using the templates at [`.github` issues](https://github.com/resonatehq-examples/.github/issues/new/choose). Security issues: see [SECURITY.md](https://github.com/resonatehq-examples/.github/blob/main/SECURITY.md).
